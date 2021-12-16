@@ -29,17 +29,34 @@ function(add_library_rust)
     ## Import Rust target
     corrosion_import_crate(MANIFEST_PATH "${_LIB_PATH}/Cargo.toml")
 
-    ## Set cxxbridge values
-
     # parse stem
     _get_stem_name_of_path(PATH ${_LIB_PATH})
     set(_LIB_PATH_STEM ${STEM_OF_PATH})
 
-    set(CXXBRIDGE_BINARY_FOLDER ${CMAKE_BINARY_DIR}/cargo/build/${Rust_CARGO_TARGET}/cxxbridge) 
-    set(COMMON_HEADER ${CXXBRIDGE_BINARY_FOLDER}/rust/cxx.h)
-    set(BINDING_HEADER ${CXXBRIDGE_BINARY_FOLDER}/${_LIB_PATH_STEM}/src/lib.rs.h)
-    set(BINDING_SOURCE ${CXXBRIDGE_BINARY_FOLDER}/${_LIB_PATH_STEM}/src/lib.rs.cc)
-    set(CXX_BINDING_INCLUDE_DIR ${CXXBRIDGE_BINARY_FOLDER})
+    if (CMAKE_VS_PLATFORM_NAME)
+        set (build_dir "${CMAKE_VS_PLATFORM_NAME}/$<CONFIG>")
+    elseif(CMAKE_CONFIGURATION_TYPES)
+        set (build_dir "$<CONFIG>")
+    else()
+        set (build_dir .)
+    endif()
+
+    set(CARGO_ROOT_FOLDER ${CMAKE_BINARY_DIR}/${build_dir})
+    set(CXXBRIDGE_GENERATED_FOLDER ${CARGO_ROOT_FOLDER}/cargo/build/${Rust_CARGO_TARGET}/cxxbridge)
+    set(CXXBRIDGE_GENERATED_FINAL_FOLDER ${CMAKE_BINARY_DIR}/cxxbridge)
+
+    # Copy output files out to a path that does not contain a generator expression
+    ADD_CUSTOM_COMMAND(
+        TARGET cargo-build_${_LIB_PATH_STEM}
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CXXBRIDGE_GENERATED_FOLDER} ${CXXBRIDGE_GENERATED_FINAL_FOLDER}
+    )
+
+    ## Set cxxbridge values
+    set(COMMON_HEADER ${CXXBRIDGE_GENERATED_FINAL_FOLDER}/rust/cxx.h)
+    set(BINDING_HEADER ${CXXBRIDGE_GENERATED_FINAL_FOLDER}/${_LIB_PATH_STEM}/src/lib.rs.h)
+    set(BINDING_SOURCE ${CXXBRIDGE_GENERATED_FINAL_FOLDER}/${_LIB_PATH_STEM}/src/lib.rs.cc)
+    set(CXX_BINDING_INCLUDE_DIR ${CXXBRIDGE_GENERATED_FINAL_FOLDER})
 
     ## Create cxxbridge target
     add_custom_command(
